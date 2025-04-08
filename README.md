@@ -4,7 +4,7 @@
 
 **Khoa Nguyen** - knguy578@calpoly.edu
 
-**Simon H** - [calpoly email]
+**Simon H** - shuan113@calpoly.edu
 
 **Anthony T** - athang01@calpoly.edu
 

@@ -6,7 +6,7 @@
 
 **Simon H** - [calpoly email]
 
-**Anthony T** - [calpoly email]
+**Anthony T** - athang01@calpoly.edu
 
 **Anthony H** - [calpoly email]
 

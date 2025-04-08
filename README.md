@@ -13,8 +13,9 @@
 
 
 # Group Project Proposal:
-[Idea]
-[short description]
+Idea: Minecraft
+
+The focus is on the player, their inventory, and a crafting system. This is kinda like a crafting menu. The player should be able to collect, view/manage inventory, and craft new items. Relational DB: Recipes, inventory, items, and players are all relational. Read/Write: Players collect items (write), view inventory (read), and craft (read + write).
 
 
 ideas google docs:

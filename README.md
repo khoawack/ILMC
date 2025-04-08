@@ -1,10 +1,18 @@
-# 365GroupProject
+# 365 Group Project
+
+**Group members:**
+
 **Khoa Nguyen** - knguy578@calpoly.edu
+
 **Simon H** - [calpoly email]
+
 **Anthony T** - [calpoly email]
+
 **Anthony H** - [calpoly email]
 
-**Group Project Proposal:**
+
+
+# Group Project Proposal:
 [Idea]
 [short description]
 

@@ -8,7 +8,7 @@
 
 **Anthony T** - athang01@calpoly.edu
 
-**Anthony H** - [calpoly email]
+**Anthony H** - hhuang55@calpoly.edu
 
 
 

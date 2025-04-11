@@ -21,3 +21,6 @@ The focus is on the player, their inventory, and a crafting system. This is kind
 # Misc:
 Team shared google doc:
 https://docs.google.com/document/d/1vAehDPg94yG51CendaWWxjHhip33USwoeQeOpQV4Gyc/edit?usp=sharing
+
+User Stories:
+https://docs.google.com/document/d/1zkM2fu0wpOGxywioXm-_4HEXuQbD23YzWEZdSvjjHvM/edit?usp=sharing

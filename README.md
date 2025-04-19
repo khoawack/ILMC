@@ -24,3 +24,7 @@ https://docs.google.com/document/d/1vAehDPg94yG51CendaWWxjHhip33USwoeQeOpQV4Gyc/
 
 User Stories:
 https://docs.google.com/document/d/1zkM2fu0wpOGxywioXm-_4HEXuQbD23YzWEZdSvjjHvM/edit?usp=sharing
+
+End Points:
+https://docs.google.com/document/d/1eoEepMeF0vE65s_X_-AE74ON9JOz9WWnNv5sqxF-cmE/edit?usp=sharing
+

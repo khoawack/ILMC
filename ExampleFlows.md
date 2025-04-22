@@ -2,7 +2,7 @@
 
 This document provides a walkthrough of a crafting scenario using the ILYMC API.
 
-## Crafting an Iron Pickaxe
+## Example Scenario: Crafting an Iron Pickaxe
 
 Alex the Miner wants to craft a new iron pickaxe but isn’t sure what he can make with the materials he has. He performs the following steps:
 
@@ -58,41 +58,66 @@ Alex the Miner wants to craft a new iron pickaxe but isn’t sure what he can ma
 
 Alex successfully crafts the item and is ready to mine more resources.
 
-## Track Progress Towards Collecting Items
+## Example Scenario: Mining with a Wooden Pickaxe
+Alex wants to gather basic resources using his wooden pickaxe. Drops are randomized but will never exceed "stone" quality and always return 1-3 units.
+The ores that you have a chance to receive will be based on the pickaxe you have. Drop rates TBD
 
-Alex wants to keep track of all the items he's been wanting to collect in his checklist. 
-
-1. **Get player's collected items checklist**
-   **Request:** `GET /collection/checklist`
-   **Response:**
+1. **Mine for resources**  
+   **Request:** `POST /action/mine/wooden`  
+   **Possible Response (randomized):**  
    ```json
    {
-    "collected_items": [
-      "iron_ingot",
-      "diamond",
-      "bread",
-      "stone_axe"
-    ],
-    "uncollected_items": [
-      "ender_pearl",
-      "golden_apple",
-      "elytra",
-    ]
+     "sku": "cobblestone",
+     "quantity": 3
    }
    ```
 
-2. **Mark as collected**
-   **Request:** `POST /collection/mark`
-   **Body:**
-```json
-{
-  "item_name": "ender_pearl"
-}
-```
-**Reponse:**
-```json
-{
-  "sucess": true,
-  "message": "Marked ender_pearl as collected"
-}
-scenario ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~...
+2. **View updated inventory**  
+   **Request:** `GET /inventory`  
+   **Response:**  
+   ```json
+   {
+     "items": [
+       { "sku": "stone", "quantity": 3 },
+       { "sku": "wooden_pickaxe", "quantity": 1 }
+     ]
+   }
+   ```
+Alex successfully gathers stone resources and can now craft stone-tier tools.
+
+## Example Scenario: Organizing Inventory
+Alex now wants a better and more organized inventory. He performs the following steps:
+
+1. **Collect a basic item**  
+   **Request:** `POST /action/collect`  
+   **Response:**  
+   ```json
+   {
+     "sku": "OAK_LOG",
+     "quantity": 1
+   }
+   ```
+
+2. **View inventory**  
+   **Request:** `GET /inventory`  
+   **Response:**  
+   ```json
+   {
+     "items": [
+       {
+         "sku": "OAK_LOG",
+         "quantity": 1
+       }
+     ]
+   }
+   ```
+
+3. **Favorite the collected item**  
+   **Request:** `POST /inventory/OAK_LOG/favorite`  
+   **Response:**  
+   ```json
+   {
+     "success": true
+   }
+   ```
+Alex now has an inventory with items favorited. He can now filter them out better.

@@ -58,6 +58,41 @@ Alex the Miner wants to craft a new iron pickaxe but isn’t sure what he can ma
 
 Alex successfully crafts the item and is ready to mine more resources.
 
-## EXAMPLE 2 NAME
+## Track Progress Towards Collecting Items
 
+Alex wants to keep track of all the items he's been wanting to collect in his checklist. 
+
+1. **Get player's collected items checklist**
+   **Request:** `GET /collection/checklist`
+   **Response:**
+   ```json
+   {
+    "collected_items": [
+      "iron_ingot",
+      "diamond",
+      "bread",
+      "stone_axe"
+    ],
+    "uncollected_items": [
+      "ender_pearl",
+      "golden_apple",
+      "elytra",
+    ]
+   }
+   ```
+
+2. **Mark as collected**
+   **Request:** `POST /collection/mark`
+   **Body:**
+```json
+{
+  "item_name": "ender_pearl"
+}
+```
+**Reponse:**
+```json
+{
+  "sucess": true,
+  "message": "Marked ender_pearl as collected"
+}
 scenario ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~...

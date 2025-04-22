@@ -58,3 +58,6 @@ Alex the Miner wants to craft a new iron pickaxe but isn’t sure what he can ma
 
 Alex successfully crafts the item and is ready to mine more resources.
 
+## EXAMPLE 2 NAME
+
+scenario ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~...

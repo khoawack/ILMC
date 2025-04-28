@@ -1,4 +1,4 @@
-# 365 Group Project - ILYMC
+# 365 Group Project - ILMC
 
 **Group members:**
 

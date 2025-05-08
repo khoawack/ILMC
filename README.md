@@ -22,7 +22,9 @@ The focus is on the player, their inventory, and a crafting system. This is kind
 
 # Getting Started:
 
-run : ``` pip install -r requirements.txt ```
+installation CLI command: ``` pip install -r requirements.txt ```
+
+to run the server: ``` uvicorn app.main:app --reload ```
 
 
 # Misc:

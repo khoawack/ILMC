@@ -63,7 +63,14 @@ Alex wants to gather basic resources using his wooden pickaxe. Drops are randomi
 The ores that you have a chance to receive will be based on the pickaxe you have. Drop rates TBD
 
 1. **Mine for resources**  
-   **Request:** `POST /action/mine/wooden`  
+   **Request:** `POST /action/mine`
+
+    **Body:**  
+   ```json
+   {
+     "pickaxe_name": "wooden_pickaxe"
+   }
+   ```  
    **Possible Response (randomized):**  
    ```json
    {

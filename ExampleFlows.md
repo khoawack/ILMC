@@ -79,7 +79,7 @@ The ores that you have a chance to receive will be based on the pickaxe you have
    }
    ```
 
-3. **View updated inventory**  
+2. **View updated inventory**  
    **Request:** `GET /inventory`  
    **Response:**  
    ```json

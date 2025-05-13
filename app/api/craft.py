@@ -13,7 +13,7 @@ ITEM_NAME_TO_SKU = {
     "iron_pickaxe": "IRON_PICKAXE"
 }
 
-@router.post("/craft")
+@router.post("/")
 def craft_item(req: CraftRequest):
     with db.engine.begin() as conn:
         # get sku

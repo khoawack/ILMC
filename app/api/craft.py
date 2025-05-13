@@ -3,7 +3,7 @@ from app import database as db
 import sqlalchemy
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/action", tags=["action"])
+router = APIRouter(prefix="/craft", tags=["craft"])
 
 class CraftRequest(BaseModel):
     item_name: str
@@ -15,25 +15,78 @@ ITEM_NAME_TO_SKU = {
 
 @router.post("/craft")
 def craft_item(req: CraftRequest):
-    sku = ITEM_NAME_TO_SKU.get(req.item_name.lower())
-    if not sku:
-        return {"success": False, "error": "Invalid item_name"}
-
     with db.engine.begin() as conn:
-        result = conn.execute(
-            sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
-            {"sku": sku}
+        # get sku
+        item_result = conn.execute(
+            sqlalchemy.text("SELECT sku FROM item WHERE LOWER(name) = LOWER(:name)"),
+            {"name": req.item_name}
         ).first()
 
-        if result:
+        if not item_result:
+            return {"success": False, "error": "Item does not exist"}
+
+        craft_sku = item_result.sku
+
+        # get recipe
+        recipe = conn.execute(
+            sqlalchemy.text("SELECT id, output_qty FROM recipe WHERE craftable_item = :sku"),
+            {"sku": craft_sku}
+        ).first()
+
+        if not recipe:
+            return {"success": False, "error": "Item is not craftable"}
+
+        recipe_id = recipe.id
+        output_qty = recipe.output_qty
+
+        # get ingredient
+        ingredients = conn.execute(
+            sqlalchemy.text("SELECT item_sku, quantity FROM recipe_ingredients WHERE recipe_id = :recipe_id"),
+            {"recipe_id": recipe_id}
+        ).fetchall()
+
+        #  check if ingredient in inv
+        for ing in ingredients:
+            total_needed = ing.quantity * req.quantity
+            inv = conn.execute(
+                sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
+                {"sku": ing.item_sku}
+            ).first()
+
+            if not inv or inv.amount < total_needed:
+                return {
+                    "success": False,
+                    "error": f"Not enough {ing.item_sku}. Required: {total_needed}, Found: {inv.amount if inv else 0}"
+                }
+
+        # minus the ingredients
+        for ing in ingredients:
+            total_needed = ing.quantity * req.quantity
             conn.execute(
-                sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku"),
-                {"qty": req.quantity, "sku": sku}
-            )
-        else:
-            conn.execute(
-                sqlalchemy.text("INSERT INTO inventory (sku, item_name, amount) VALUES (:sku, :name, :qty)"),
-                {"sku": sku, "name": req.item_name, "qty": req.quantity}
+                sqlalchemy.text("UPDATE inventory SET amount = amount - :qty WHERE sku = :sku"),
+                {"qty": total_needed, "sku": ing.item_sku}
             )
 
-    return {"success": True, "crafted_quantity": req.quantity}
+        # add item in inv
+        total_crafted = output_qty * req.quantity
+        existing = conn.execute(
+            sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
+            {"sku": craft_sku}
+        ).first()
+
+        if existing:
+            conn.execute(
+                sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku"),
+                {"qty": total_crafted, "sku": craft_sku}
+            )
+        else:
+            name_result = conn.execute(
+                sqlalchemy.text("SELECT name FROM item WHERE sku = :sku"),
+                {"sku": craft_sku}
+            ).first()
+            conn.execute(
+                sqlalchemy.text("INSERT INTO inventory (sku, item_name, amount) VALUES (:sku, :name, :qty)"),
+                {"sku": craft_sku, "name": name_result.name, "qty": total_crafted}
+            )
+
+    return {"success": True, "crafted_quantity": total_crafted}

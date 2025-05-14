@@ -7,7 +7,7 @@ This document provides a walkthrough of a crafting scenario using the ILYMC API.
 Alex the Miner wants to craft a new iron pickaxe but isn’t sure what he can make with the materials he has. He performs the following steps:
 
 1. **Check item recipe**  
-   **Request:** `GET /craft/recipe/iron_pickaxe`  
+   **Request:** `GET /craft/recipe?item_name={item_name}`  
    **Response:**  
     ```json
     {

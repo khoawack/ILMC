@@ -43,38 +43,65 @@ def collect_item():
         "quantity": quantity
     }
 
-class CraftRequest(BaseModel):
-    item_name: str
-    quantity: int
+class MineRequest(BaseModel):
+    pickaxe_name: str
 
-
-
-ITEM_NAME_TO_SKU = {
-    "iron_pickaxe": "IRON_PICKAXE"
+# ores drop odds tables
+DROP_TABLES = {
+    "wooden_pickaxe": [("COBBLESTONE", 1.0)],
+    "stone_pickaxe": [("COBBLESTONE", 0.75), ("IRON", 0.25)],
+    "iron_pickaxe": [("COBBLESTONE", 0.5), ("IRON", 0.3), ("GOLD", 0.15), ("DIAMOND", 0.05)],
+    "gold_pickaxe": [("COBBLESTONE", 0.2), ("IRON", 0.6), ("GOLD", 0.12), ("DIAMOND", 0.08)],
+    "diamond_pickaxe": [("COBBLESTONE", 0.1), ("IRON", 0.5), ("GOLD", 0.25), ("DIAMOND", 0.15)],
 }
 
-@router.post("/craft")
-def craft_item(req: CraftRequest):
-    sku = ITEM_NAME_TO_SKU.get(req.item_name.lower())
-    if not sku:
-        return {"success": False, "error": "Invalid item_name"}
+def random_ore(pickaxe_name: str) -> str:
+    drops = DROP_TABLES.get(pickaxe_name)
+    if not drops:
+        return None
+    roll = random.random()
+    cumulative = 0
+    for sku, prob in drops:
+        cumulative += prob
+        if roll <= cumulative:
+            return sku
+    return drops[-1][0]
+
+@router.post("/mine")
+def mine_ores(body: MineRequest):
+    pickaxe_name = body.pickaxe_name.strip()
+
+    mined_sku = random_ore(pickaxe_name)
+    if not mined_sku:
+        return {"error": "Invalid pickaxe name"}, 400
+
+    quantity = random.randint(1, 3)
 
     with db.engine.begin() as conn:
-        result = conn.execute(
+        # check if item already exists in inventory
+        existing = conn.execute(
             sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
-            {"sku": sku}
-        ).first()
+            {"sku": mined_sku}
+        ).fetchone()
 
-        if result:
+        if existing:
             conn.execute(
                 sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku"),
-                {"qty": req.quantity, "sku": sku}
+                {"qty": quantity, "sku": mined_sku}
             )
         else:
+            # get name from item table
+            mined_name = conn.execute(
+                sqlalchemy.text("SELECT name FROM item WHERE sku = :sku"),
+                {"sku": mined_sku}
+            ).scalar() or mined_sku
+
             conn.execute(
-                sqlalchemy.text("INSERT INTO inventory (sku, item_name, amount) VALUES (:sku, :name, :qty)"),
-                {"sku": sku, "name": req.item_name, "qty": req.quantity}
+                sqlalchemy.text("""
+                    INSERT INTO inventory (sku, item_name, amount, favorite)
+                    VALUES (:sku, :name, :qty, FALSE)
+                """),
+                {"sku": mined_sku, "name": mined_name, "qty": quantity}
             )
 
-    return {"success": True, "crafted_quantity": req.quantity}
-
+    return {"sku": mined_sku, "quantity": quantity}

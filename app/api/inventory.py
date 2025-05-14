@@ -24,13 +24,6 @@ def get_inventory():
     return {"items": items}
 
 
-@router.post("/reset")
-def reset_inventory():
-    with db.engine.begin() as conn:
-        conn.execute(sqlalchemy.text("DELETE FROM inventory"))
-    return {"success": True, "message": "Inventory has been reset."}
-
-
 class FavoriteRequest(BaseModel):
     sku: str
     favorite: bool = True

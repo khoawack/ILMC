@@ -5,7 +5,7 @@ from app.database import Base
 class Item(Base):
     __tablename__ = "item"
 
-    sku = Column(Text,primary_key=True)
+    sku = Column(Text, primary_key=True)
     name = Column(Text, nullable=False)
     description = Column(Text)
     type = Column(Text)
@@ -13,19 +13,30 @@ class Item(Base):
     inventory_items = relationship("Inventory", back_populates="item")
     collection_logs = relationship("CollectionLog", back_populates="item")
     recipe_ingredients = relationship("RecipeIngredient", back_populates="item")
-    recipe = relationship("Recipe", back_populates="crafted_item", uselist=False, foreign_keys="Recipe.craftable_item")
+    recipe = relationship("Recipe", back_populates="crafted_item", uselist=False)
 
 
 class Inventory(Base):
     __tablename__ = "inventory"
 
     id = Column(Integer, primary_key=True, index=True)
-    sku = Column(Text, ForeignKey("item.sku"), nullable=False)        
-    item_name = Column(Text, nullable=False)   
-    favorite = Column(Boolean, default=False) 
-    amount = Column(Integer, default=0)       
+    sku = Column(Text, ForeignKey("item.sku"), nullable=False)
+    item_name = Column(Text, nullable=False)
+    favorite = Column(Boolean, default=False)
+    amount = Column(Integer, default=0)
 
     item = relationship("Item", back_populates="inventory_items")
+
+
+class CollectionLog(Base):
+    __tablename__ = "collection_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_sku = Column(Text, ForeignKey("item.sku"), nullable=False)
+    quantity_collected = Column(Text)
+    collected_at = Column(TIMESTAMP)
+
+    item = relationship("Item", back_populates="collection_logs")
 
 
 class Recipe(Base):
@@ -35,11 +46,11 @@ class Recipe(Base):
     craftable_item = Column(Text, ForeignKey("item.sku"), unique=True)
     output_qty = Column(Integer)
 
-    crafted_item = relationship("Item", back_populates="recipe", foreign_key=[craftable_item])
+    crafted_item = relationship("Item", back_populates="recipe")
     ingredients = relationship("RecipeIngredient", back_populates="recipe")
 
 
-class Recipe_Ingredients(Base):
+class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredients"
 
     recipe_id = Column(Integer, ForeignKey("recipe.id"), primary_key=True)
@@ -48,14 +59,3 @@ class Recipe_Ingredients(Base):
 
     recipe = relationship("Recipe", back_populates="ingredients")
     item = relationship("Item", back_populates="recipe_ingredients")
-
-
-class Collection_Log(Base):
-    __tablename__ = "collection_log"
-
-    id = Column(Integer, primary_key=True)
-    item_sku = Column(Text, ForeignKey("item.sku"), nullable=False)
-    quantity_collected = Column(Text)
-    collected_at = Column(TIMESTAMP)
-
-    item = relationship("Item", back_populates="collection_logs")   

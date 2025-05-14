@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from app import database as db
 import sqlalchemy
 from pydantic import BaseModel
@@ -90,3 +90,51 @@ def craft_item(req: CraftRequest):
             )
 
     return {"success": True, "crafted_quantity": total_crafted}
+
+class RecipeRequest(BaseModel):
+    item_name: str 
+
+@router.get("/recipe")
+def get_crafting_recipe(item_name: str = Query(..., alias="item_name")):
+    item_name = item_name.strip()
+
+    with db.engine.begin() as conn:
+        # get da SKU from item name
+        sku_result = conn.execute(
+            sqlalchemy.text("SELECT sku FROM item WHERE LOWER(name) = LOWER(:item_name)"),
+            {"item_name": item_name}
+        ).fetchone()
+
+        if not sku_result:
+            return {"error": "Item not found"}, 404
+
+        item_sku = sku_result[0]
+
+        # get recipe id for that item
+        recipe_result = conn.execute(
+            sqlalchemy.text("SELECT id FROM recipe WHERE craftable_item = :sku"),
+            {"sku": item_sku}
+        ).fetchone()
+
+        if not recipe_result:
+            return {"error": "Recipe not found"}, 404
+
+        recipe_id = recipe_result[0]
+
+        # get ingredients for that recipe
+        ingredients = conn.execute(
+            sqlalchemy.text("""
+                SELECT item_sku, quantity
+                FROM recipe_ingredients
+                WHERE recipe_id = :recipe_id
+            """),
+            {"recipe_id": recipe_id}
+        ).fetchall()
+
+        return {
+            "item_name": item_name,
+            "ingredients": [
+                {"sku": row.item_sku, "quantity": str(row.quantity)}
+                for row in ingredients
+            ]
+        }

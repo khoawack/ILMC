@@ -60,3 +60,13 @@ def get_favorites():
             for row in result
         ]
     }
+
+@router.get("/item", summary="Get all item names")
+def get_all_item_names():
+    with db.engine.begin() as conn:
+        result = conn.execute(
+            sqlalchemy.text("SELECT name FROM item")
+        ).fetchall()
+        return [row.name for row in result]
+    
+    

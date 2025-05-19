@@ -1,31 +1,18 @@
 from fastapi import APIRouter, Query
 from app import database as db
 import sqlalchemy
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/craft", tags=["craft"])
 
 class CraftRequest(BaseModel):
-    item_name: str
-    quantity: int
-
-ITEM_NAME_TO_SKU = {
-    "iron_pickaxe": "IRON_PICKAXE"
-}
+    sku: str  # changed from item_name to sku
+    quantity: int = Field(gt=0, description="Must be at least 1")
 
 @router.post("/")
 def craft_item(req: CraftRequest):
     with db.engine.begin() as conn:
-        # get sku
-        item_result = conn.execute(
-            sqlalchemy.text("SELECT sku FROM item WHERE LOWER(name) = LOWER(:name)"),
-            {"name": req.item_name}
-        ).first()
-
-        if not item_result:
-            return {"success": False, "error": "Item does not exist"}
-
-        craft_sku = item_result.sku
+        craft_sku = req.sku.strip().upper()
 
         # get recipe
         recipe = conn.execute(
@@ -39,13 +26,13 @@ def craft_item(req: CraftRequest):
         recipe_id = recipe.id
         output_qty = recipe.output_qty
 
-        # get ingredient
+        # get ingredients
         ingredients = conn.execute(
             sqlalchemy.text("SELECT item_sku, quantity FROM recipe_ingredients WHERE recipe_id = :recipe_id"),
             {"recipe_id": recipe_id}
         ).fetchall()
 
-        #  check if ingredient in inv
+        # check if ingredients are in inventory
         for ing in ingredients:
             total_needed = ing.quantity * req.quantity
             inv = conn.execute(
@@ -59,7 +46,7 @@ def craft_item(req: CraftRequest):
                     "error": f"Not enough {ing.item_sku}. Required: {total_needed}, Found: {inv.amount if inv else 0}"
                 }
 
-        # minus the ingredients
+        # subtract ingredients
         for ing in ingredients:
             total_needed = ing.quantity * req.quantity
             conn.execute(
@@ -67,7 +54,7 @@ def craft_item(req: CraftRequest):
                 {"qty": total_needed, "sku": ing.item_sku}
             )
 
-        # add item in inv
+        # add crafted item to inventory
         total_crafted = output_qty * req.quantity
         existing = conn.execute(
             sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
@@ -92,28 +79,16 @@ def craft_item(req: CraftRequest):
     return {"success": True, "crafted_quantity": total_crafted}
 
 class RecipeRequest(BaseModel):
-    item_name: str 
+    sku: str  # changed from item_name to sku
 
 @router.get("/recipe")
-def get_crafting_recipe(item_name: str = Query(..., alias="item_name")):
-    item_name = item_name.strip()
+def get_crafting_recipe(sku: str = Query(..., alias="sku")):
+    sku = sku.strip().upper()
 
     with db.engine.begin() as conn:
-        # get da SKU from item name
-        sku_result = conn.execute(
-            sqlalchemy.text("SELECT sku FROM item WHERE LOWER(name) = LOWER(:item_name)"),
-            {"item_name": item_name}
-        ).fetchone()
-
-        if not sku_result:
-            return {"error": "Item not found"}, 404
-
-        item_sku = sku_result[0]
-
-        # get recipe id for that item
         recipe_result = conn.execute(
             sqlalchemy.text("SELECT id FROM recipe WHERE craftable_item = :sku"),
-            {"sku": item_sku}
+            {"sku": sku}
         ).fetchone()
 
         if not recipe_result:
@@ -121,7 +96,6 @@ def get_crafting_recipe(item_name: str = Query(..., alias="item_name")):
 
         recipe_id = recipe_result[0]
 
-        # get ingredients for that recipe
         ingredients = conn.execute(
             sqlalchemy.text("""
                 SELECT item_sku, quantity
@@ -132,18 +106,60 @@ def get_crafting_recipe(item_name: str = Query(..., alias="item_name")):
         ).fetchall()
 
         return {
-            "item_name": item_name,
+            "craftable_item": sku,
             "ingredients": [
                 {"sku": row.item_sku, "quantity": str(row.quantity)}
                 for row in ingredients
             ]
         }
-    
 
-@router.get("/item", summary="Get all item names")
-def get_all_item_names():
+@router.get("/item", summary="Get all craftable item SKUs")
+def get_all_craftable_skus():
     with db.engine.begin() as conn:
         result = conn.execute(
-            sqlalchemy.text("SELECT name FROM item")
+            sqlalchemy.text("SELECT craftable_item FROM recipe")
         ).fetchall()
-        return [row.name for row in result]
+        return [row.craftable_item for row in result]
+
+
+@router.get("/available")
+def get_craftable_items():
+    craftable = []
+
+    with db.engine.begin() as conn:
+        # get full inv
+        inventory_rows = conn.execute(
+            sqlalchemy.text("SELECT sku, amount FROM inventory")
+        ).fetchall()
+        inventory = {row.sku: row.amount for row in inventory_rows}
+
+        # get all recipes
+        recipes = conn.execute(
+            sqlalchemy.text("SELECT id, craftable_item, output_qty FROM recipe")
+        ).fetchall()
+
+        for recipe in recipes:
+            recipe_id = recipe.id
+            craftable_sku = recipe.craftable_item
+            output_qty = recipe.output_qty
+
+            # get require inrgriednt
+            ingredients = conn.execute(
+                sqlalchemy.text("SELECT item_sku, quantity FROM recipe_ingredients WHERE recipe_id = :recipe_id"),
+                {"recipe_id": recipe_id}
+            ).fetchall()
+
+            #check if inv has enough ingredient
+            can_craft = True
+            for ing in ingredients:
+                if ing.item_sku not in inventory or inventory[ing.item_sku] < ing.quantity:
+                    can_craft = False
+                    break
+
+            if can_craft:
+                craftable.append({
+                    "sku": craftable_sku,
+                    "output_quantity": output_qty
+                })
+
+    return {"craftable": craftable}

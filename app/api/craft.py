@@ -138,3 +138,12 @@ def get_crafting_recipe(item_name: str = Query(..., alias="item_name")):
                 for row in ingredients
             ]
         }
+    
+
+@router.get("/item", summary="Get all item names")
+def get_all_item_names():
+    with db.engine.begin() as conn:
+        result = conn.execute(
+            sqlalchemy.text("SELECT name FROM item")
+        ).fetchall()
+        return [row.name for row in result]

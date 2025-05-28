@@ -102,25 +102,28 @@ class MineRequest(BaseModel):
     pickaxe_name: str
     username: str
 
-DROP_TABLES = {
-    "wooden_pickaxe": [("COBBLESTONE", 1.0)],
-    "stone_pickaxe": [("COBBLESTONE", 0.75), ("IRON", 0.25)],
-    "iron_pickaxe": [("COBBLESTONE", 0.5), ("IRON", 0.3), ("GOLD", 0.15), ("DIAMOND", 0.05)],
-    "gold_pickaxe": [("COBBLESTONE", 0.2), ("IRON", 0.6), ("GOLD", 0.12), ("DIAMOND", 0.08)],
-    "diamond_pickaxe": [("COBBLESTONE", 0.1), ("IRON", 0.5), ("GOLD", 0.25), ("DIAMOND", 0.15)],
-}
+def random_ore(pickaxe_sku: str) -> str | None:
+    with db.engine.begin() as conn:
+        result = conn.execute(
+            sqlalchemy.text("""
+                SELECT item_sku, drop_chance
+                FROM drop_rates
+                WHERE pickaxe_sku = :pickaxe
+            """),
+            {"pickaxe": pickaxe_sku}
+        ).fetchall()
 
-def random_ore(pickaxe_name: str) -> str:
-    drops = DROP_TABLES.get(pickaxe_name)
-    if not drops:
+    if not result:
         return None
+
     roll = random.random()
     cumulative = 0
-    for sku, prob in drops:
-        cumulative += prob
+    for row in result:
+        cumulative += row.drop_chance
         if roll <= cumulative:
-            return sku
-    return drops[-1][0]
+            return row.item_sku
+
+    return result[-1].item_sku
 
 @router.get("/tools", summary="Get all tools in inventory")
 def get_tools_in_inventory(username: str = Query(...)):

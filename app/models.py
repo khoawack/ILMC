@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Text, Integer, Boolean, ForeignKey, TIMESTAMP
+from sqlalchemy import Column, Text, Integer, Float, Boolean, ForeignKey, TIMESTAMP
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -55,3 +55,14 @@ class RecipeIngredient(Base):
 
     recipe_rel = relationship("Recipe", back_populates="ingredients")
     item_rel = relationship("Item", back_populates="ingredients_in")
+
+class DropRates(Base):
+    __tablename__ = "drop_rates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pickaxe_sku = Column(Text, ForeignKey("item.sku"), nullable=False)
+    item_sku = Column(Text, ForeignKey("item.sku"), nullable=False)
+    drop_chance = Column(Float, nullable=False)
+
+    pickaxe = relationship("Item", foreign_keys=[pickaxe_sku])
+    item = relationship("Item", foreign_keys=[item_sku])

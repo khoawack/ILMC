@@ -1,9 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, HTTPException
 from app import database as db
 import sqlalchemy
 import random
-from fastapi import Request
 from pydantic import BaseModel
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/action", tags=["action"])
 
@@ -13,29 +13,77 @@ BASIC_ITEMS = [
     {"sku": "SEED", "name": "Seed"},
 ]
 
+#get user_id from username
+def get_user_id(conn, username: str) -> int:
+    user = conn.execute(
+        sqlalchemy.text("SELECT id FROM user WHERE name = :username"),
+        {"username": username}
+    ).first()
+
+    if not user:
+        raise ValueError(f"User '{username}' not found.")
+
+    return user.id
+
 @router.post("/collect")
-def collect_item():
+def collect_item(username: str = Query(...)):
     item = random.choice(BASIC_ITEMS)
     quantity = random.randint(1, 3)
 
     with db.engine.begin() as conn:
+        try:
+            user_id = get_user_id(conn, username)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        # Cooldown check
+        recent = conn.execute(
+            sqlalchemy.text("""
+                SELECT collected_at FROM collection_log
+                WHERE user_id = :user_id
+                ORDER BY collected_at DESC
+                LIMIT 1
+            """),
+            {"user_id": user_id}
+        ).scalar()
+
+        if recent and (datetime.now(timezone.utc) - recent) < timedelta(seconds=10):
+            raise HTTPException(status_code=429, detail="Collect cooldown: wait a few seconds")
+
         result = conn.execute(
-            sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
-            {"sku": item["sku"]}
+            sqlalchemy.text("""
+                SELECT amount FROM inventory
+                WHERE sku = :sku AND user_id = :user_id
+            """),
+            {"sku": item["sku"], "user_id": user_id}
         ).first()
 
         if result:
             conn.execute(
-                sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku"),
-                {"qty": quantity, "sku": item["sku"]}
+                sqlalchemy.text("""
+                    UPDATE inventory
+                    SET amount = amount + :qty
+                    WHERE sku = :sku AND user_id = :user_id
+                """),
+                {"qty": quantity, "sku": item["sku"], "user_id": user_id}
             )
         else:
             conn.execute(
-                sqlalchemy.text(
-                    "INSERT INTO inventory (sku, item_name, amount) VALUES (:sku, :name, :qty)"
-                ),
-                {"sku": item["sku"], "name": item["name"], "qty": quantity}
+                sqlalchemy.text("""
+                    INSERT INTO inventory (user_id, sku, amount, favorite)
+                    VALUES (:user_id, :sku, :qty, FALSE)
+                """),
+                {"user_id": user_id, "sku": item["sku"], "qty": quantity}
             )
+
+        # Log the collection in collection_log
+        conn.execute(
+            sqlalchemy.text("""
+                INSERT INTO collection_log (user_id, item_sku, quantity_collected, collected_at)
+                VALUES (:user_id, :sku, :qty, NOW())
+            """),
+            {"user_id": user_id, "sku": item["sku"], "qty": quantity}
+        )
 
     return {
         "item_name": item["name"],
@@ -45,8 +93,8 @@ def collect_item():
 
 class MineRequest(BaseModel):
     pickaxe_name: str
+    username: str
 
-# ores drop odds tables
 DROP_TABLES = {
     "wooden_pickaxe": [("COBBLESTONE", 1.0)],
     "stone_pickaxe": [("COBBLESTONE", 0.75), ("IRON", 0.25)],
@@ -73,24 +121,48 @@ def mine_ores(body: MineRequest):
 
     mined_sku = random_ore(pickaxe_name)
     if not mined_sku:
-        return {"error": "Invalid pickaxe name"}, 400
+        raise HTTPException(status_code=400, detail="Invalid pickaxe name")
 
     quantity = random.randint(1, 3)
 
     with db.engine.begin() as conn:
-        # check if item already exists in inventory
+        try:
+            user_id = get_user_id(conn, body.username)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        # Cooldown check
+        recent = conn.execute(
+            sqlalchemy.text("""
+                SELECT collected_at FROM collection_log
+                WHERE user_id = :user_id
+                ORDER BY collected_at DESC
+                LIMIT 1
+            """),
+            {"user_id": user_id}
+        ).scalar()
+
+        if recent and (datetime.now(timezone.utc) - recent) < timedelta(seconds=10):
+            raise HTTPException(status_code=429, detail="Mine cooldown: wait a few seconds")
+
         existing = conn.execute(
-            sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
-            {"sku": mined_sku}
+            sqlalchemy.text("""
+                SELECT amount FROM inventory
+                WHERE sku = :sku AND user_id = :user_id
+            """),
+            {"sku": mined_sku, "user_id": user_id}
         ).fetchone()
 
         if existing:
             conn.execute(
-                sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku"),
-                {"qty": quantity, "sku": mined_sku}
+                sqlalchemy.text("""
+                    UPDATE inventory
+                    SET amount = amount + :qty
+                    WHERE sku = :sku AND user_id = :user_id
+                """),
+                {"qty": quantity, "sku": mined_sku, "user_id": user_id}
             )
         else:
-            # get name from item table
             mined_name = conn.execute(
                 sqlalchemy.text("SELECT name FROM item WHERE sku = :sku"),
                 {"sku": mined_sku}
@@ -98,10 +170,19 @@ def mine_ores(body: MineRequest):
 
             conn.execute(
                 sqlalchemy.text("""
-                    INSERT INTO inventory (sku, item_name, amount, favorite)
-                    VALUES (:sku, :name, :qty, FALSE)
+                    INSERT INTO inventory (user_id, sku, amount, favorite)
+                    VALUES (:user_id, :sku, :qty, FALSE)
                 """),
-                {"sku": mined_sku, "name": mined_name, "qty": quantity}
+                {"user_id": user_id, "sku": mined_sku, "qty": quantity}
             )
+
+        # Log the mining in collection_log
+        conn.execute(
+            sqlalchemy.text("""
+                INSERT INTO collection_log (user_id, item_sku, quantity_collected, collected_at)
+                VALUES (:user_id, :sku, :qty, NOW())
+            """),
+            {"user_id": user_id, "sku": mined_sku, "qty": quantity}
+        )
 
     return {"sku": mined_sku, "quantity": quantity}

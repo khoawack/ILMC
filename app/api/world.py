@@ -2,14 +2,14 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from app import database as db
 import sqlalchemy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 router = APIRouter(prefix="/world", tags=["world"])
 
-# Utility to get user_id from username
+# Get user_id from username
 def get_user_id(conn, username: str) -> int:
     user = conn.execute(
-        sqlalchemy.text("SELECT id FROM user WHERE name = :username"),
+        sqlalchemy.text('SELECT id FROM "user" WHERE name = :username'),
         {"username": username}
     ).first()
     if not user:
@@ -60,7 +60,6 @@ def drop_item(req: DropRequest):
 @router.get("/view")
 def view_floor():
     with db.engine.begin() as conn:
-        # Clean up expired floor items
         conn.execute(sqlalchemy.text("DELETE FROM floor WHERE dropped_at < NOW() - INTERVAL '5 minutes'"))
 
         result = conn.execute(
@@ -89,7 +88,6 @@ class PickupRequest(BaseModel):
 @router.post("/pickup")
 def pickup_item(req: PickupRequest):
     with db.engine.begin() as conn:
-        # Clean up expired floor items
         conn.execute(sqlalchemy.text("DELETE FROM floor WHERE dropped_at < NOW() - INTERVAL '5 minutes'"))
 
         try:
@@ -116,12 +114,26 @@ def pickup_item(req: PickupRequest):
                 {"qty": floor_item.quantity, "uid": user_id, "sku": floor_item.item_sku}
             )
         else:
+            # Fetch item name for new inventory entry
+            name_result = conn.execute(
+                sqlalchemy.text("SELECT name FROM item WHERE sku = :sku"),
+                {"sku": floor_item.item_sku}
+            ).first()
+
+            if not name_result:
+                raise HTTPException(status_code=400, detail="Item not found in item table")
+
             conn.execute(
                 sqlalchemy.text("""
-                    INSERT INTO inventory (user_id, sku, amount, favorite)
-                    VALUES (:uid, :sku, :qty, FALSE)
+                    INSERT INTO inventory (user_id, sku, item_name, amount, favorite)
+                    VALUES (:uid, :sku, :item_name, :qty, FALSE)
                 """),
-                {"uid": user_id, "sku": floor_item.item_sku, "qty": floor_item.quantity}
+                {
+                    "uid": user_id,
+                    "sku": floor_item.item_sku,
+                    "item_name": name_result.name,
+                    "qty": floor_item.quantity
+                }
             )
 
         conn.execute(

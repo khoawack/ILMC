@@ -8,13 +8,12 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 # get user_id from username
 def get_user_id(conn, username: str) -> int:
     user = conn.execute(
-        sqlalchemy.text("SELECT id FROM user WHERE name = :username"),
+        sqlalchemy.text('SELECT id FROM "user" WHERE name = :username'),
         {"username": username}
     ).first()
 
     if not user:
         raise ValueError(f"User '{username}' not found.")
-
     return user.id
 
 @router.get("/")

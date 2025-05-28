@@ -13,16 +13,15 @@ BASIC_ITEMS = [
     {"sku": "SEED", "name": "Seed"},
 ]
 
-#get user_id from username
+# Get user_id from username
 def get_user_id(conn, username: str) -> int:
     user = conn.execute(
-        sqlalchemy.text("SELECT id FROM user WHERE name = :username"),
+        sqlalchemy.text('SELECT id FROM "user" WHERE name = :username'),
         {"username": username}
     ).first()
 
     if not user:
         raise ValueError(f"User '{username}' not found.")
-
     return user.id
 
 @router.post("/collect")
@@ -35,6 +34,9 @@ def collect_item(username: str = Query(...)):
             user_id = get_user_id(conn, username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
+
+        # Clean old collection logs
+        conn.execute(sqlalchemy.text("DELETE FROM collection_log WHERE collected_at < NOW() - INTERVAL '1 day'"))
 
         # Cooldown check
         recent = conn.execute(
@@ -68,12 +70,17 @@ def collect_item(username: str = Query(...)):
                 {"qty": quantity, "sku": item["sku"], "user_id": user_id}
             )
         else:
+            item_name = conn.execute(
+                sqlalchemy.text("SELECT name FROM item WHERE sku = :sku"),
+                {"sku": item["sku"]}
+            ).scalar() or item["name"]
+
             conn.execute(
                 sqlalchemy.text("""
-                    INSERT INTO inventory (user_id, sku, amount, favorite)
-                    VALUES (:user_id, :sku, :qty, FALSE)
+                    INSERT INTO inventory (user_id, sku, item_name, amount, favorite)
+                    VALUES (:user_id, :sku, :item_name, :qty, FALSE)
                 """),
-                {"user_id": user_id, "sku": item["sku"], "qty": quantity}
+                {"user_id": user_id, "sku": item["sku"], "item_name": item_name, "qty": quantity}
             )
 
         # Log the collection in collection_log
@@ -115,11 +122,41 @@ def random_ore(pickaxe_name: str) -> str:
             return sku
     return drops[-1][0]
 
+@router.get("/tools", summary="Get all tools in inventory")
+def get_tools_in_inventory(username: str = Query(...)):
+    with db.engine.begin() as conn:
+        try:
+            user_id = get_user_id(conn, username)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        result = conn.execute(
+            sqlalchemy.text("""
+                SELECT inventory.sku, inventory.item_name, inventory.amount, inventory.favorite
+                FROM inventory
+                JOIN item ON inventory.sku = item.sku
+                WHERE item.type = 'Tool' AND inventory.user_id = :user_id
+            """),
+            {"user_id": user_id}
+        ).fetchall()
+
+    return {
+        "tools": [
+            {
+                "sku": row.sku,
+                "item_name": row.item_name,
+                "quantity": row.amount,
+                "favorite": row.favorite,
+            }
+            for row in result
+        ]
+    }
+
 @router.post("/mine")
 def mine_ores(body: MineRequest):
     pickaxe_name = body.pickaxe_name.strip()
-
     mined_sku = random_ore(pickaxe_name)
+
     if not mined_sku:
         raise HTTPException(status_code=400, detail="Invalid pickaxe name")
 
@@ -130,6 +167,9 @@ def mine_ores(body: MineRequest):
             user_id = get_user_id(conn, body.username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
+
+        # Clean old collection logs
+        conn.execute(sqlalchemy.text("DELETE FROM collection_log WHERE collected_at < NOW() - INTERVAL '1 day'"))
 
         # Cooldown check
         recent = conn.execute(
@@ -170,10 +210,10 @@ def mine_ores(body: MineRequest):
 
             conn.execute(
                 sqlalchemy.text("""
-                    INSERT INTO inventory (user_id, sku, amount, favorite)
-                    VALUES (:user_id, :sku, :qty, FALSE)
+                    INSERT INTO inventory (user_id, sku, item_name, amount, favorite)
+                    VALUES (:user_id, :sku, :item_name, :qty, FALSE)
                 """),
-                {"user_id": user_id, "sku": mined_sku, "qty": quantity}
+                {"user_id": user_id, "sku": mined_sku, "item_name": mined_name, "qty": quantity}
             )
 
         # Log the mining in collection_log

@@ -1,17 +1,24 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from app import database as db
 import sqlalchemy
 from pydantic import BaseModel, Field
+from app.api.action import get_user_id
 
 router = APIRouter(prefix="/craft", tags=["craft"])
 
 class CraftRequest(BaseModel):
     sku: str  # changed from item_name to sku
     quantity: int = Field(gt=0, description="Must be at least 1")
+    username: str
 
 @router.post("/")
 def craft_item(req: CraftRequest):
     with db.engine.begin() as conn:
+        try:
+            user_id = get_user_id(conn, req.username)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
         craft_sku = req.sku.strip().upper()
 
         # get recipe
@@ -36,8 +43,8 @@ def craft_item(req: CraftRequest):
         for ing in ingredients:
             total_needed = ing.quantity * req.quantity
             inv = conn.execute(
-                sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
-                {"sku": ing.item_sku}
+                sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku AND user_id = :user_id"),
+                {"sku": ing.item_sku, "user_id": user_id}
             ).first()
 
             if not inv or inv.amount < total_needed:
@@ -50,30 +57,34 @@ def craft_item(req: CraftRequest):
         for ing in ingredients:
             total_needed = ing.quantity * req.quantity
             conn.execute(
-                sqlalchemy.text("UPDATE inventory SET amount = amount - :qty WHERE sku = :sku"),
-                {"qty": total_needed, "sku": ing.item_sku}
+                sqlalchemy.text("UPDATE inventory SET amount = amount - :qty WHERE sku = :sku AND user_id = :user_id"),
+                {"qty": total_needed, "sku": ing.item_sku, "user_id": user_id}
             )
 
         # add crafted item to inventory
         total_crafted = output_qty * req.quantity
         existing = conn.execute(
-            sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku"),
-            {"sku": craft_sku}
+            sqlalchemy.text("SELECT amount FROM inventory WHERE sku = :sku AND user_id = :user_id"),
+            {"sku": craft_sku, "user_id": user_id}
         ).first()
 
         if existing:
             conn.execute(
-                sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku"),
-                {"qty": total_crafted, "sku": craft_sku}
+                sqlalchemy.text("UPDATE inventory SET amount = amount + :qty WHERE sku = :sku AND user_id = :user_id"),
+                {"qty": total_crafted, "sku": craft_sku, "user_id": user_id}
             )
         else:
-            name_result = conn.execute(
+            item_name = conn.execute(
                 sqlalchemy.text("SELECT name FROM item WHERE sku = :sku"),
                 {"sku": craft_sku}
-            ).first()
+            ).scalar() or craft_sku
+
             conn.execute(
-                sqlalchemy.text("INSERT INTO inventory (sku, item_name, amount) VALUES (:sku, :name, :qty)"),
-                {"sku": craft_sku, "name": name_result.name, "qty": total_crafted}
+                sqlalchemy.text("""
+                    INSERT INTO inventory (user_id, sku, item_name, amount, favorite)
+                    VALUES (:user_id, :sku, :item_name, :qty, FALSE)
+                """),
+                {"user_id": user_id, "sku": craft_sku, "item_name": item_name, "qty": total_crafted}
             )
 
     return {"success": True, "crafted_quantity": total_crafted}
@@ -121,19 +132,22 @@ def get_all_craftable_skus():
         ).fetchall()
         return [row.craftable_item for row in result]
 
-
 @router.get("/available")
-def get_craftable_items():
+def get_craftable_items(username: str = Query(...)):
     craftable = []
 
     with db.engine.begin() as conn:
-        # get full inv
+        try:
+            user_id = get_user_id(conn, username)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
         inventory_rows = conn.execute(
-            sqlalchemy.text("SELECT sku, amount FROM inventory")
+            sqlalchemy.text("SELECT sku, amount FROM inventory WHERE user_id = :user_id"),
+            {"user_id": user_id}
         ).fetchall()
         inventory = {row.sku: row.amount for row in inventory_rows}
 
-        # get all recipes
         recipes = conn.execute(
             sqlalchemy.text("SELECT id, craftable_item, output_qty FROM recipe")
         ).fetchall()
@@ -143,13 +157,11 @@ def get_craftable_items():
             craftable_sku = recipe.craftable_item
             output_qty = recipe.output_qty
 
-            # get require inrgriednt
             ingredients = conn.execute(
                 sqlalchemy.text("SELECT item_sku, quantity FROM recipe_ingredients WHERE recipe_id = :recipe_id"),
                 {"recipe_id": recipe_id}
             ).fetchall()
 
-            #check if inv has enough ingredient
             can_craft = True
             for ing in ingredients:
                 if ing.item_sku not in inventory or inventory[ing.item_sku] < ing.quantity:

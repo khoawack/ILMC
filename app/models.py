@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Text, Integer, Boolean, ForeignKey, TIMESTAMP, func
+from sqlalchemy import Column, Text, Integer, Float, Boolean, ForeignKey, TIMESTAMP
+
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -61,9 +62,19 @@ class RecipeIngredient(Base):
     item_sku = Column(Text, ForeignKey("item.sku"), primary_key=True)
     quantity = Column(Integer)
 
-    recipe = relationship("Recipe", back_populates="ingredients")
-    item = relationship("Item", back_populates="recipe_ingredients")
+    recipe_rel = relationship("Recipe", back_populates="ingredients")
+    item_rel = relationship("Item", back_populates="ingredients_in")
 
+class DropRates(Base):
+    __tablename__ = "drop_rates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pickaxe_sku = Column(Text, ForeignKey("item.sku"), nullable=False)
+    item_sku = Column(Text, ForeignKey("item.sku"), nullable=False)
+    drop_chance = Column(Float, nullable=False)
+
+    pickaxe = relationship("Item", foreign_keys=[pickaxe_sku])
+    item = relationship("Item", foreign_keys=[item_sku])
 
 class Floor(Base):
     __tablename__ = "floor"
@@ -74,8 +85,6 @@ class Floor(Base):
     dropped_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     item = relationship("Item", back_populates="floor_drops")
-
-
 
 class User(Base):
     __tablename__ = "user"

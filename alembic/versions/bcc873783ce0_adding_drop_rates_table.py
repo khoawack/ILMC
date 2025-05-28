@@ -1,7 +1,7 @@
 """adding drop rates table
 
 Revision ID: bcc873783ce0
-Revises: afedee811b2a
+Revises: ea7f7b11766d
 Create Date: 2025-05-28 05:35:51.090505
 
 """

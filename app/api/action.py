@@ -99,7 +99,7 @@ def collect_item(username: str = Query(...)):
     }
 
 class MineRequest(BaseModel):
-    pickaxe_name: str
+    pickaxe_sku: str
     username: str
 
 def random_ore(pickaxe_sku: str) -> str | None:
@@ -157,8 +157,8 @@ def get_tools_in_inventory(username: str = Query(...)):
 
 @router.post("/mine")
 def mine_ores(body: MineRequest):
-    pickaxe_name = body.pickaxe_name.strip()
-    mined_sku = random_ore(pickaxe_name)
+    pickaxe_sku = body.pickaxe_sku.strip()
+    mined_sku = random_ore(pickaxe_sku)
 
     if not mined_sku:
         raise HTTPException(status_code=400, detail="Invalid pickaxe name")

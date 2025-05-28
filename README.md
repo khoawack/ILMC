@@ -26,6 +26,10 @@ installation CLI command: ``` pip install -r requirements.txt ```
 
 to run the server: ``` uvicorn app.main:app --reload ```
 
+list of items:
+![image](https://github.com/user-attachments/assets/e04fa431-80e2-40f4-ab23-6e23cf6b5eea)
+
+
 
 # Misc:
 Team shared google doc:

@@ -5,7 +5,8 @@ import sqlalchemy
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/reset")
-def reset_inventory():
+def reset_users_and_inventory():
     with db.engine.begin() as conn:
         conn.execute(sqlalchemy.text("DELETE FROM inventory"))
-    return {"success": True, "message": "Inventory has been reset."}
+        conn.execute(sqlalchemy.text('DELETE FROM "user"'))
+    return {"success": True, "message": "All users and inventory have been reset."}

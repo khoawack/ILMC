@@ -5,7 +5,6 @@ import sqlalchemy
 
 router = APIRouter(prefix="/user", tags=["user"])
 
-# Pydantic schema
 class UserCreate(BaseModel):
     name: str
 
@@ -24,10 +23,17 @@ def create_user(user: UserCreate):
 @router.delete("/{user_id}")
 def delete_user(user_id: int):
     with db.engine.begin() as conn:
+        # First delete inventory
+        conn.execute(
+            sqlalchemy.text("DELETE FROM inventory WHERE user_id = :id"),
+            {"id": user_id}
+        )
+        # Then delete user
         result = conn.execute(
             sqlalchemy.text("DELETE FROM \"user\" WHERE id = :id"),
             {"id": user_id}
         )
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="User not found")
-    return {"success": True, "message": f"User {user_id} deleted."}
+    return {"success": True, "message": f"User {user_id} and associated inventory deleted."}
+

@@ -43,3 +43,6 @@ https://docs.google.com/document/d/1eoEepMeF0vE65s_X_-AE74ON9JOz9WWnNv5sqxF-cmE/
 
 Entities Relation Diagram:
 https://lucid.app/lucidchart/e8e7cb00-e5f0-48e5-bdbc-e46a5835f0dd/edit?viewport_loc=-65%2C-118%2C2279%2C1089%2C0_0&invitationId=inv_005bf225-b5ae-4343-badd-ddd18d9c9682
+
+Endpoint execution time:
+https://docs.google.com/spreadsheets/d/1J6pJ24c7y3mzPXHR72AYN3M_8Hu9g8S3RdwXFkfyTOc/edit?usp=sharing

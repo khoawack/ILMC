@@ -12,11 +12,22 @@ class UserCreate(BaseModel):
 @router.post("/create")
 def create_user(user: UserCreate):
     with db.engine.begin() as conn:
+        # Check if username already exists
+        existing = conn.execute(
+            sqlalchemy.text('SELECT id FROM "user" WHERE name = :name'),
+            {"name": user.name}
+        ).first()
+
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists.")
+
+        # Insert new user
         result = conn.execute(
-            sqlalchemy.text("INSERT INTO \"user\" (name) VALUES (:name) RETURNING id"),
+            sqlalchemy.text('INSERT INTO "user" (name) VALUES (:name) RETURNING id'),
             {"name": user.name}
         )
         user_id = result.scalar_one()
+
     return {"success": True, "id": user_id}
 
 # Delete user by ID

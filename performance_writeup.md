@@ -11,4 +11,11 @@ This overall distribution reflects how a real world game backend might scale.
 TODO
 
 # Performance tuning
-TODO
+| QUERY PLAN                                                                                               |
+| -------------------------------------------------------------------------------------------------------- |
+| Sort  (cost=74.54..77.21 rows=1070 width=48) (actual time=0.041..0.041 rows=0 loops=1)                   |
+|   Sort Key: dropped_at DESC                                                                              |
+|   Sort Method: quicksort  Memory: 25kB                                                                   |
+|   ->  Seq Scan on floor  (cost=0.00..20.70 rows=1070 width=48) (actual time=0.009..0.009 rows=0 loops=1) |
+| Planning Time: 0.284 ms                                                                                  |
+| Execution Time: 0.101 ms                                                                                 |

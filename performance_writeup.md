@@ -11,11 +11,41 @@ This overall distribution reflects how a real world game backend might scale.
 TODO
 
 # Performance tuning
-| QUERY PLAN                                                                                               |
-| -------------------------------------------------------------------------------------------------------- |
-| Sort  (cost=74.54..77.21 rows=1070 width=48) (actual time=0.041..0.041 rows=0 loops=1)                   |
-|   Sort Key: dropped_at DESC                                                                              |
-|   Sort Method: quicksort  Memory: 25kB                                                                   |
-|   ->  Seq Scan on floor  (cost=0.00..20.70 rows=1070 width=48) (actual time=0.009..0.009 rows=0 loops=1) |
-| Planning Time: 0.284 ms                                                                                  |
-| Execution Time: 0.101 ms                                                                                 |
+
+
+EXPLAIN BEFORE INDEX
+
+EXPLAIN ANALYZE
+SELECT * FROM floor
+ORDER BY dropped_at DESC;
+
+
+| QUERY PLAN                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------- |
+| Sort  (cost=828.39..853.39 rows=10000 width=21) (actual time=3.162..4.024 rows=10000 loops=1)                  |
+|   Sort Key: dropped_at DESC                                                                                    |
+|   Sort Method: quicksort  Memory: 1010kB                                                                       |
+|   ->  Seq Scan on floor  (cost=0.00..164.00 rows=10000 width=21) (actual time=0.020..0.891 rows=10000 loops=1) |
+| Planning Time: 0.278 ms                                                                                        |
+| Execution Time: 4.608 ms                                                                                       |
+
+
+
+EXPLAIN AFTER INDEX
+
+CREATE INDEX idx_floor_dropped_at_desc
+ON floor (dropped_at DESC);
+
+EXPLAIN ANALYZE
+SELECT * FROM floor
+ORDER BY dropped_at DESC;
+
+
+| QUERY PLAN                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Index Scan using idx_floor_dropped_at_desc on floor  (cost=0.29..253.68 rows=10000 width=21) (actual time=0.025..4.274 rows=10000 loops=1) |
+| Planning Time: 0.364 ms                                                                                                                    |
+| Execution Time: 4.746 ms                                                                                                                   |
+
+
+To optimize the slowest endpoint (/world/view), We used EXPLAIN ANALYZE on the query SELECT * FROM floor ORDER BY dropped_at DESC and saw that the database performed a sequential scan followed by a sort, which is inefficient as data grows. The actual execution time was about 4.6 ms. To improve performance, We added an index on the dropped_at column in descending order using CREATE INDEX idx_floor_dropped_at_desc ON floor (dropped_at DESC);. After rerunning EXPLAIN ANALYZE, the query used an index scan instead, which avoids sorting and is better for scalability. Although the actual execution time after indexing was similar (around 4.7 ms), the database is now using a more efficient access path. This change prepares the system to handle larger datasets more efficiently, making the endpoint more scalable and performant in the long run.

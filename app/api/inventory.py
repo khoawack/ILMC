@@ -121,7 +121,7 @@ def get_tools_in_inventory(username: str = Query(...)):
                 SELECT inventory.sku, inventory.item_name, inventory.amount, inventory.favorite
                 FROM inventory
                 JOIN item ON inventory.sku = item.sku
-                WHERE item.type = 'Tool' AND inventory.user_id = :user_id
+                WHERE item.type = 'tool' AND inventory.user_id = :user_id
             """),
             {"user_id": user_id}
         ).fetchall()

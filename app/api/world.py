@@ -41,10 +41,20 @@ def drop_item(req: DropRequest):
         if not inventory or inventory.amount < req.quantity:
             raise HTTPException(status_code=400, detail="Not enough items to drop")
 
-        conn.execute(
-            sqlalchemy.text("UPDATE inventory SET amount = amount - :qty WHERE user_id = :uid AND sku = :sku"),
-            {"qty": req.quantity, "uid": user_id, "sku": req.sku}
-        )
+        new_amount = inventory.amount - req.quantity
+
+        if new_amount == 0:
+            # Remove item from inventory
+            conn.execute(
+                sqlalchemy.text("DELETE FROM inventory WHERE user_id = :uid AND sku = :sku"),
+                {"uid": user_id, "sku": req.sku}
+            )
+        else:
+            # Just update the amount
+            conn.execute(
+                sqlalchemy.text("UPDATE inventory SET amount = :new_amount WHERE user_id = :uid AND sku = :sku"),
+                {"new_amount": new_amount, "uid": user_id, "sku": req.sku}
+            )
 
         conn.execute(
             sqlalchemy.text("""

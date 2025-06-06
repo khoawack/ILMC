@@ -11,6 +11,7 @@ class CraftRequest(BaseModel):
     quantity: int = Field(gt=0, description="Must be at least 1")
     username: str
 
+
 @router.post("/")
 def craft_item(req: CraftRequest):
     with db.engine.begin() as conn:
@@ -52,13 +53,16 @@ def craft_item(req: CraftRequest):
                     "success": False,
                     "error": f"Not enough {ing.item_sku}. Required: {total_needed}, Found: {inv.amount if inv else 0}"
                 }
-
-        # subtract ingredients
+        #subtract ingredients
         for ing in ingredients:
             total_needed = ing.quantity * req.quantity
             conn.execute(
                 sqlalchemy.text("UPDATE inventory SET amount = amount - :qty WHERE sku = :sku AND user_id = :user_id"),
                 {"qty": total_needed, "sku": ing.item_sku, "user_id": user_id}
+            )
+            conn.execute(
+                sqlalchemy.text("DELETE FROM inventory WHERE user_id = :user_id AND sku = :sku AND amount <= 0"),
+                {"user_id": user_id, "sku": ing.item_sku}
             )
 
         # add crafted item to inventory
@@ -88,6 +92,7 @@ def craft_item(req: CraftRequest):
             )
 
     return {"success": True, "crafted_quantity": total_crafted}
+
 
 class RecipeRequest(BaseModel):
     sku: str  # changed from item_name to sku
